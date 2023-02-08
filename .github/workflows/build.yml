@@ -1,7 +1,10 @@
 name: Test
 
-on: [push]
-
+on: 
+  push:
+    branches-ignore: [master]
+  pull_request:
+    branches: ['*']
 
 jobs:
   build:
@@ -9,8 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        run: rustup update stable && rustup default stable
-      - name: Run apt-get install pkg-config
         run: apt-get update && apt-get install pkg-config
       - name: Run cargo build
         run: cargo build
