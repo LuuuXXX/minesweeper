@@ -1,11 +1,11 @@
 name: CI
 on:
   push:
-    branches-ignores: [master]
+    branches-ignore: [master]
   pull_request:
     branches: ['*']
     
-default:
+defaults:
   run:
     shell: bash
 
