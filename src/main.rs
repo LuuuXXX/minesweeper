@@ -10,4 +10,5 @@ fn main() {
         .add_startup_system(spawn_layout)
         .add_system(print_moust_button_input_system)
         .run()
+    print!("{:?}", WinitSettings::desktop_app());
 }
