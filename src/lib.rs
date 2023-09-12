@@ -9,27 +9,40 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use resources::map::*;
 use resources::board_options::*;
+use resources::tile::Tile;
 use resources::tile::Tile::*;
 
 use crate::bounds::Bounds2;
 use crate::components::coordinates::Coordinates;
+use crate::components::uncover::Uncover;
 use crate::resources::board::Board;
 use crate::systems::event::TileTriggerEvent;
 use crate::systems::input::input_handler;
 use crate::systems::uncover::trigger_event_handler;
 use crate::systems::uncover::uncover_tiles;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, States, Default)]
+pub enum AppState {
+    #[default]
+    InGame,
+    Out,
+}
 
-pub struct BoardPlugin;
+pub struct BoardPlugin {
+    pub running_state: AppState,
+}
 
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut App) {
+
         app.add_systems(Startup, Self::create_board);
         app.add_systems(Update, input_handler);
         // Logic
         app.add_systems(Update, trigger_event_handler)
             .add_systems(Update, uncover_tiles)
             .add_event::<TileTriggerEvent>();
+
+        app.add_systems(OnExit(AppState::Out), Self::cleanup_board);
 
         log::info!("Loaded Board Plugin");
     }
@@ -52,7 +65,9 @@ impl BoardPlugin {
             options.map_size.0, 
             options.map_size.1,
         );
+        // Set board bombs
         map.set_bombs(options.boom_count);
+
         #[cfg(feature = "debug")]
         log::info!("{}", map.console_output());
 
@@ -65,16 +80,10 @@ impl BoardPlugin {
                 (map.width(), map.height())
             ),
         };
-
-        log::info!("tile_size: {:?}", tile_size);
-
         let board_size = Vec2::new(
             map.width() as f32 * tile_size,
             map.height() as f32 * tile_size,
         );
-
-        log::info!("board_size: {:?}", board_size);
-
         // We define the board anchor position 
         let board_position = match options.position {
             BoardPosition::Centered { offset } => {
@@ -86,15 +95,13 @@ impl BoardPlugin {
             },
             BoardPosition::Custom(p) => p,
         };
-
-        log::info!("board_position: {:?}", board_position);
-
         // Init assert
         let font: Handle<Font> = asset_server.load("fonts/pixeled.ttf");
         let bomb_image: Handle<Image> = asset_server.load("sprites/bomb.png");
         let mut covered_tiles = HashMap::with_capacity((map.width() * map.height()).into());
+        let mut safe_start = None;
 
-        commands
+        let boadr_entity = commands
             .spawn(SpriteBundle::default())
             .insert(Name::new("Board"))
             .insert(Transform::from_translation(board_position))
@@ -124,9 +131,11 @@ impl BoardPlugin {
                     bomb_image, 
                     font,
                     Color::DARK_GRAY,
-                    &mut covered_tiles
+                    &mut covered_tiles,
+                    &mut safe_start,
                 );
-            });
+            })
+            .id();
         
         // Add the main board resource
         commands.insert_resource(Board {
@@ -139,8 +148,16 @@ impl BoardPlugin {
                 size: board_size,
             },
             tile_size: tile_size,
-            covered_tiles
+            covered_tiles,
+            entity: boadr_entity
         });
+
+        // Safe Start, Select a tile to uncover which is empty
+        if options.safe_place {
+            if let Some(entity) = safe_start {
+                commands.entity(entity).insert(Uncover);
+            }
+        }
     }
 
     /// Computes a tile size that matches the window according to the tile map size
@@ -165,7 +182,8 @@ impl BoardPlugin {
         bomb_image: Handle<Image>,
         font: Handle<Font>,
         covered_tile_color: Color,
-        covered_tiles: &mut HashMap<Coordinates, Entity>
+        covered_tiles: &mut HashMap<Coordinates, Entity>,
+        safe_start_entity: &mut Option<Entity>,
     ) {
         // Tiles
         for (y, line) in map.iter().enumerate() {
@@ -207,6 +225,10 @@ impl BoardPlugin {
                         .insert(Name::new("Tile Cover"))
                         .id();
                     covered_tiles.insert(coordinates, entity);
+                    // Safe Start
+                    if safe_start_entity.is_none() && *tile == Tile::Empty {
+                        *safe_start_entity = Some(entity);
+                    }
                 });
 
                 // Inset bomb sprites
@@ -273,5 +295,12 @@ impl BoardPlugin {
             transform: Transform::from_xyz(0., 0., 1.),
             ..Default::default()
         }
+    }
+
+    fn cleanup_board(board: Res<Board>, mut commands: Commands) {
+        commands
+            .entity(board.entity)
+            .despawn_recursive();
+        commands.remove_resource::<Board>();
     }
 }

@@ -1,7 +1,7 @@
 #[cfg(feature = "debug")]
 use colored::Colorize;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Tile {
     // Is a Bomb
     Bomb,
