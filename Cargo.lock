@@ -2174,6 +2174,7 @@ name = "mine"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_render",
  "colored",
  "rand",
  "serde",

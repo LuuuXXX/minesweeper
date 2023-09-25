@@ -10,6 +10,7 @@ debug = ["colored"]
 
 [dependencies]
 bevy = "0.11"
+bevy_render = "0.11"
 rand = "0.8.5"
 colored = { version = "2.0.4", optional = true}
 

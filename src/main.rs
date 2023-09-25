@@ -1,17 +1,15 @@
 use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowTheme};
-use bevy::log;
 
-use mine::{BoardPlugin, AppState};
+use mine::BoardPlugin;
+use mine::resources::board_asset::{SpriteMaterial, BoardAsset};
 use mine::resources::board_options::BoardOptions;
-
-
 
 fn main() {
     // Init the world
     let mut app = App::new();
     // Window setup
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+    app.add_plugins(DefaultPlugins.set(WindowPlugin { // 创建默认游戏窗口大小
         primary_window: Some(Window {
             title: "Mine Sweeper".to_string(),
             resolution: (700., 800.).into(),
@@ -25,51 +23,50 @@ fn main() {
         }),
         ..default()
     }));
-    
-    // Initialize the board with options
-    app.insert_resource(BoardOptions {
+
+    // Init the board
+    app
+        .add_plugins(BoardPlugin)
+        .add_systems(Startup, setup)
+        .run();
+}
+
+// Set Camera
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // 2D orthographic camera
+    commands.spawn(Camera2dBundle::default());
+    // Board Option
+    commands.insert_resource(BoardOptions { // 初始化游戏资源
         map_size: (20, 20),
         boom_count: 40,
         tile_padding: 3.0,
         safe_place: true,
         ..Default::default()
     });
-    
-    // Init the board
-    app.add_plugins(BoardPlugin {
-        running_state: AppState::InGame,
+    // Board Asset
+    commands.insert_resource(BoardAsset {
+        label: "Default".to_string(),
+        board_material: SpriteMaterial {
+            color: Color::WHITE,
+            ..Default::default()
+        },
+        tile_material: SpriteMaterial {
+            color: Color::DARK_GRAY,
+            ..Default::default()
+        },
+        covered_tile_material: SpriteMaterial { 
+            color: Color::GRAY, 
+            ..Default::default()
+        },
+        bomb_counter_font: asset_server.load("fonts/pixeled.ttf"),
+        bomb_counter_colors: BoardAsset::default_color(),
+        flag_material: SpriteMaterial {
+            color: Color::WHITE,
+            texture: asset_server.load("sprites/flag.png")
+        },
+        bomb_material: SpriteMaterial {
+            color: Color::WHITE,
+            texture: asset_server.load("sprites/bomb.png")
+        },
     });
-
-    // Init the camera
-    app.add_systems(Startup, setup);
-
-    // Init State handler
-    app.add_state::<AppState>()
-        .add_systems(Update, state_handler);
-    
-    // Run game
-    app.run();
-}
-
-// Set Camera
-pub fn setup(mut commands: Commands) {
-    // 2D orthographic camera
-    commands.spawn(Camera2dBundle::default());
-}
-
-fn state_handler(mut state: ResMut<State<AppState>>, keys: Res<Input<KeyCode>>) {
-    if keys.just_pressed(KeyCode::C) {
-        log::info!("clearing detected");
-        if state.get() == &AppState::InGame {
-            log::info!("clearing game");
-            *state = State::new(AppState::Out);
-        }
-    }
-    if keys.just_pressed(KeyCode::G) {
-        log::info!("loading detected");
-        if state.get() == &AppState::Out {
-            log::info!("loading game");
-            *state = State::new(AppState::InGame);
-        }
-    }
 }
